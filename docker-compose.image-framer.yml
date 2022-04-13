@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
 
-  tezland-app:
+  image-framer:
     container_name: image-framer
     image: image-framer:latest
     build:
