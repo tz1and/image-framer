@@ -1,0 +1,16 @@
+version: "3.7"
+
+services:
+
+  tezland-app:
+    container_name: image-framer
+    image: image-framer:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 9053:9053
+
+networks:
+  default:
+    name: tz1and_prod
