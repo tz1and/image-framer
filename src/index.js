@@ -1,10 +1,10 @@
-import "./styles.css"
+import './styles.css'
 
-import * as THREE from "three"
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls"
-import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter"
+import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
-import { saveAs } from "file-saver"
+import { saveAs } from 'file-saver'
 import { GUI } from 'dat.gui'
 
 const scene = new THREE.Scene()
@@ -14,9 +14,9 @@ const download = () => {
   exporter.parse(scene, (gltfJson) => {
     const jsonString = JSON.stringify(gltfJson)
     const blob = new Blob([jsonString], {
-      type: "application/json"
+      type: 'application/json'
     })
-    saveAs(blob, "frame.gltf")
+    saveAs(blob, 'frame.gltf')
   }, {
     binary: false
   })
@@ -25,8 +25,17 @@ const download = () => {
 const main = () => {
   const canvas = document.querySelector('#c')
   const renderer = new THREE.WebGLRenderer({
-    canvas
+    canvas,
+    antialias: true
   })
+
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = THREE.PCFShadowMap
+
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1)
+  directionalLight.position.set(0, 0, 1)
+  directionalLight.castShadow = true
+  scene.add(directionalLight)
 
   const fov = 45
   const aspect = 2
@@ -40,8 +49,8 @@ const main = () => {
   controls.update()
 
   scene.background = new THREE.Color('white')
-  const light = new THREE.AmbientLight(0xffffff)
-  scene.add(light)
+  const ambientLight = new THREE.AmbientLight(0xffffff)
+  scene.add(ambientLight)
 
   const frameArea = (sizeToFitOnScreen, boxSize, boxCenter, camera) => {
     const halfSizeToFitOnScreen = sizeToFitOnScreen * 0.5
@@ -62,28 +71,30 @@ const main = () => {
     camera.lookAt(boxCenter.x, boxCenter.y, boxCenter.z)
   }
 
-  let frame
+  let modelFrame
+  let modelImage
   let image
+  let color = '#7C5427'
+  let currentRoot
 
   const preview = (event) => {
-    var reader = new FileReader()
+    let reader = new FileReader()
     reader.readAsDataURL(event.target.files[0])
     reader.onload = (e) => {
-      var newImage = new Image()
-      newImage.src = e.target.result
-      const texture_plane = new THREE.Texture(newImage)
-      newImage.onload = () => {
-        console.log('image onload', newImage.width, newImage.height)
+      image = new Image()
+      image.src = e.target.result
+      const texture_plane = new THREE.Texture(image)
+      image.onload = () => {
         texture_plane.needsUpdate = true
         const material = new THREE.MeshBasicMaterial({
           map: texture_plane,
         })
         material.map.flipY = false
-        image.material = material
+        modelImage.material = material
 
-        const ratio = newImage.height / newImage.width
-        frame.scale.y = ratio
-        image.scale.y = ratio
+        const ratio = image.height / image.width
+        modelFrame.scale.y = ratio
+        modelImage.scale.y = ratio
       }
     }
   }
@@ -93,40 +104,96 @@ const main = () => {
   fileInput.accept = 'image/*'
   fileInput.addEventListener('change', preview)
 
-  const gltfLoader = new GLTFLoader()
-  gltfLoader.load('pictureframe.glb', (gltf) => {
-    const root = gltf.scene
-    scene.add(root)
+  const updateImage = () => {
+    if (image) {
+      const texture_plane = new THREE.Texture(image)
+      texture_plane.needsUpdate = true
+      const material = new THREE.MeshBasicMaterial({
+        map: texture_plane,
+      })
+      material.map.flipY = false
+      modelImage.material = material
 
-    frame = root.getObjectByName('Frame')
-    image = root.getObjectByName('Image')
-
-    const box = new THREE.Box3().setFromObject(root)
-    const boxSize = box.getSize(new THREE.Vector3()).length()
-    const boxCenter = box.getCenter(new THREE.Vector3())
-    frameArea(boxSize * 1.5, boxSize, boxCenter, camera)
-
-    controls.maxDistance = boxSize * 10
-    controls.target.copy(boxCenter)
-    controls.update()
-
-    const gui = new GUI()
-    var conf = {
-      color: '#7C5427',
-      button: () => {
-        console.log('download button')
-        download()
-      },
-      file: () => {
-        fileInput.click()
-      }
+      const ratio = image.height / image.width
+      modelFrame.scale.y = ratio
+      modelImage.scale.y = ratio
     }
-    gui.addColor(conf, 'color').onChange((colorValue) => {
-      frame.material.color.set(colorValue)
-    }).name("Change color")
-    gui.add(conf, "file").name("Upload image")
-    gui.add(conf, "button").name("Download .gltf")
+  }
+
+  const updateColor = (colorValue) => {
+    modelFrame.material.color.set(colorValue)
+    color = colorValue
+  }
+
+  const gltfLoader = new GLTFLoader()
+
+  const loadFile = async(file) => {
+    return new Promise((resolve, reject) => {
+      gltfLoader.load(file, (gltf) => {
+        let hasPrevious = false
+        if (currentRoot) {
+          scene.remove(currentRoot)
+          hasPrevious = true
+        }
+        currentRoot = gltf.scene
+        scene.add(currentRoot)
+        directionalLight.target = currentRoot
+
+        modelFrame = currentRoot.getObjectByName('Frame')
+        modelImage = currentRoot.getObjectByName('Image')
+
+        if (!hasPrevious) {
+          const box = new THREE.Box3().setFromObject(currentRoot)
+          const boxSize = box.getSize(new THREE.Vector3()).length()
+          const boxCenter = box.getCenter(new THREE.Vector3())
+          frameArea(boxSize * 1.5, boxSize, boxCenter, camera)
+
+          controls.maxDistance = boxSize * 10
+          controls.target.copy(boxCenter)
+          controls.update()
+        }
+        resolve()
+      })
+    })
+  }
+
+  const DEFAULT_FRAME = 'Thin matte frame'
+  const FRAMES = {
+    'Thin matte frame': 'pictureframe.glb',
+    'Thin matte edged frame': 'pictureframeedge.glb',
+    'Thin shiny frame': 'pictureframeshiny.glb',
+    'Thick matte frame': 'pictureframethick.glb',
+    'Thick matte beveled frame': 'pictureframebevel.glb'
+  }
+  loadFile(FRAMES[DEFAULT_FRAME])
+
+  const gui = new GUI({
+    width: 320
   })
+  let conf = {
+    frame: DEFAULT_FRAME,
+    color,
+    button: () => {
+      download()
+    },
+    file: () => {
+      fileInput.click()
+    }
+  }
+
+  gui.add(conf, 'frame', Object.keys(FRAMES)).onChange(async(option) => {
+    const file = FRAMES[option]
+    if (file) {
+      await loadFile(file)
+      updateColor(color)
+      updateImage()
+    }
+  }).name('Change frame')
+  gui.addColor(conf, 'color').onChange((colorValue) => {
+    updateColor(colorValue)
+  }).name('Change color')
+  gui.add(conf, 'file').name('Upload image')
+  gui.add(conf, 'button').name('Download .gltf')
 
   const resizeRendererToDisplaySize = (renderer) => {
     const canvas = renderer.domElement
