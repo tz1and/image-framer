@@ -11,14 +11,14 @@ const scene = new THREE.Scene()
 
 const download = () => {
   const exporter = new GLTFExporter()
-  exporter.parse(scene, (gltfJson) => {
-    const jsonString = JSON.stringify(gltfJson)
-    const blob = new Blob([jsonString], {
-      type: 'application/json'
+  exporter.parse(scene, (binaryGltf) => {
+    const blob = new Blob([binaryGltf], {
+      type: 'model/gltf-binary'
     })
-    saveAs(blob, 'frame.gltf')
+    saveAs(blob, 'frame.glb')
   }, {
-    binary: false
+    binary: true,
+    embedImages: false,
   })
 }
 
@@ -192,8 +192,8 @@ const main = () => {
   gui.addColor(conf, 'color').onChange((colorValue) => {
     updateColor(colorValue)
   }).name('Change color')
-  gui.add(conf, 'file').name('Upload image')
-  gui.add(conf, 'button').name('Download .gltf')
+  gui.add(conf, 'file').name('Select image')
+  gui.add(conf, 'button').name('Download .glb')
 
   const resizeRendererToDisplaySize = (renderer) => {
     const canvas = renderer.domElement
