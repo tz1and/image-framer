@@ -17,8 +17,7 @@ const download = () => {
     })
     saveAs(blob, 'frame.glb')
   }, {
-    binary: true,
-    embedImages: false,
+    binary: true
   })
 }
 
@@ -74,16 +73,21 @@ const main = () => {
   let modelFrame
   let modelImage
   let image
+  let mimeType
   let color = '#7C5427'
   let currentRoot
 
   const preview = (event) => {
+    const file = event.target.files[0]
+    if (!file) return
     let reader = new FileReader()
-    reader.readAsDataURL(event.target.files[0])
+    mimeType = file.type
+    reader.readAsDataURL(file)
     reader.onload = (e) => {
       image = new Image()
       image.src = e.target.result
       const texture_plane = new THREE.Texture(image)
+      texture_plane.userData.mimeType = mimeType
       image.onload = () => {
         texture_plane.needsUpdate = true
         const material = new THREE.MeshBasicMaterial({
@@ -107,6 +111,7 @@ const main = () => {
   const updateImage = () => {
     if (image) {
       const texture_plane = new THREE.Texture(image)
+      texture_plane.userData.mimeType = mimeType
       texture_plane.needsUpdate = true
       const material = new THREE.MeshBasicMaterial({
         map: texture_plane,
