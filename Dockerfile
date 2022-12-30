@@ -1,5 +1,5 @@
 # build app
-FROM node:16.13.2-alpine as build
+FROM node:16-alpine as build
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN npm install
 RUN npm run build
 
 # build prod
-FROM node:16.13.2-alpine
+FROM node:16-alpine
 
 WORKDIR /app
 

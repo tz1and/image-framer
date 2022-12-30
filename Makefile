@@ -1,5 +1,5 @@
 docker-build:
-	docker-compose -f docker-compose.image-framer.yml build
+	docker-compose -f docker-compose.image-framer.yml build --pull
 
 docker-up:
 	docker-compose -f docker-compose.image-framer.yml up -d
